@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en"> 
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>DQ Payroll</title>
+
+    <link rel="stylesheet" type="text/css" href="main.css"> <!-- Links html to main.css --> 
+
+    <script src="./node_modules/web3/dist/web3.min.js"></script> <!-- Linking web3 library --> 
+</head>
+
+<body>
+    <!-- Header image and Title -->
+    <h1><img src="./images/dq_image.png" style="vertical-align:middle" >   DQ Ethereum Payroll</h1>
+
+
+    <!-- About button (toggle) and content -->
+    <button onclick="aboutTextFunction()">About</button>
+
+    <div id="myDiv" style="display:none">
+        <h2>DQPayroll v0.0.2 is a prototype looking at how to solve current inefficiencies in the payroll process.</h2>
+
+        <h3>Current inefficiencies:</h3>
+
+        <p>- Repetitive labor (manually transfering data, phone calls, record keeping, and auditing)<br>
+            - Third party costs (payroll_inc, bank, paper etc.)<br>
+            - Employee trust (your employees trust that you will pay them the right ammout and on time)<br>
+            - Employer trust (that your employees and manages are truthful and accurate clocking in/out and totaling hours worked)
+        </p>
+
+        <h3>Tools used to solve issues:</h3>
+
+        <p>- Ethereum Smart Contract (acting as your bank and payroll company, but trasparent and at a lower (tbd) cost)<br>
+            - Finger print scanner and rasberrypi computer for clocking in and out at locations<br>
+            - An interface for setting wages, auditing, and accounting (what you are looking at)
+
+        <h3>How it works:</h3>
+        <p>You have a DQPayroll Contract on the ethereum network that holds a balance and functions for paying employees and accounting.<br>
+            Its transactions are publicly verifiable but only you have the ability to use it.<br>
+            <br>
+            - An employee will clock-in by scanning his finger.<br>
+            - Upon clocking-out with his fingerprint your Payroll Contract will pay him directly for his time worked.<br>
+            - Wages, taxes, and other withholdings are editable by you.<br>
+            - Records of every transaction will be kept.
+        </p>
+        <img src="./images/flowdiagram.jpg" width="50%"> <!-- Image of system logic -->
+    </div>
+
+    <script>
+    	// Show/hide about text function
+        function aboutTextFunction() {
+            var x = document.getElementById('myDiv');
+            if (x.style.display === "none") {
+                x.style.display = "block";
+            } else {
+                x.style.display ="none";
+            }
+        } 
+    </script>
+
+    <!-- Contract information alert button:
+        - Contract address
+        - Owners address
+        - Withholdigs address
+        - Contract balance
+        - Withholdings balance -->
+    <div class="container">
+        <button id="info-alert-button">DQPayroll information</button>
+    </div>    
+
+    <!-- Add New emps -->
+    <h2>Add New Employee</h2>
+    <div class="container">
+        <input id="address" type="text">
+        <label for="address">Employee Address</label>
+        <br>
+        <input id="name" type="text">
+        <label for="name">Employee Name</label>
+        <br>
+        <input id="wage" type="text">
+        <label for="wage">Employee Wage (ether per hour)</label>        
+        <br>
+        <input id="withholdings" type="text">
+        <label for="withholdings">Employee Withholdings (basis points)</label>
+        <button id="add-emp-button">Add</button></div>
+    </div>
+
+    <!-- Add New Clock -->
+    <h2>Add New Clock</h2>
+    <div class="container">
+        <input id="clock_address" type="text">
+        <label for="clock_address">Clock Address</label>
+        <button id="add-clock-button">Add</button></div>
+    </div>
+
+
+    <!-- Return emp Information -->
+    <h2>Employee Information</h2>
+    <div class="container">
+        <input id="look-up-by-address" type="text">
+        <label for="look-up-by-address">Employee Address</label>
+        <button id="emp-info-button">Lookup Employee Info</button>
+    </div>
+
+    <!-- Manual Add Hours for emp -->
+    <!-- Note: UI has to be connected as a authorized clock for function to execute -->
+    <h2>Manually Add Hours for Employee</h2>
+    <div class="container">
+        <input id="manual-addtime-address" type="text">
+        <label for="manual-addtime-address">Employee Address</label>    
+        <input id="hours-worked" type="text">
+        <label for="hours-worked">Hours Worked</label>
+        <button id="manual-addtime-button">Add Hours Manually</button>
+    </div>    
+
+    <!-- Manual Pay emp -->
+    <h2>Manually Pay Employee</h2>
+    <div class="container">
+        <input id="manual-pay-address" type="text">
+        <label for="manual-pay-address">Employee Address</label>    
+        <button id="manual-pay-button">Pay Manually</button>
+    </div>
+
+    <!-- Transfer Contract Ownership -->
+    <h2>Transfer Contract Ownership</h2>
+    <div class="container">
+        <input id="new_owner_address" type="text">
+        <label for="new_owner_address">New Owner Address</label>    
+        <input id="new_withholding_address" type="text">
+        <label for="new_withholding_address">New Withholding Address</label>
+        <button id="transfer_ownership_button">Transfer Ownership</button>
+    </div>
+
+    <!-- Transfer Contract Ownership -->
+    <h2>Withdraw Withholdings</h2>
+    <div class="container">
+        <button id="withdraw-wth">Withdraw Withholdings</button>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script> <!-- Accessing JQuery library -->
+
+
+    <!-- Connection to web3 and contract
+        Content: 
+            - Connection to web3 and localhost
+            - Connection to testrpc accounts[0]
+            - Variable connection to the contact
+            - ABI with of connecting evm -> js
+            - Calls and events connected to button and inputs in user-interface -->
+    <script>          
+        if (typeof web3 !== 'undefined') {
+            web3 = new Web3(web3.currentProvider);
+        } else {
+            // set the provider you want from Web3.providers
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+        }
+
+        web3.eth.defaultAccount = web3.eth.accounts[0]; // Setting our account to account 0 given by testrpc
+
+        var DQPayroll = web3.eth.contract([
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_emp_addr",
+				"type": "address"
+			}
+		],
+		"name": "payEmployee",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "emp_balance_map",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "wth_account",
+		"outputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "payWithholdings",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "kill",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "emp_struct_map",
+		"outputs": [
+			{
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"name": "wage",
+				"type": "uint256"
+			},
+			{
+				"name": "wth",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "clock_map",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_new_owner",
+				"type": "address"
+			},
+			{
+				"name": "_new_wth_addr",
+				"type": "address"
+			}
+		],
+		"name": "transOwnership",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_emp_addr",
+				"type": "address"
+			},
+			{
+				"name": "_time_worked",
+				"type": "uint256"
+			}
+		],
+		"name": "clockOut",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_emp_addr",
+				"type": "address"
+			},
+			{
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"name": "_wage",
+				"type": "uint256"
+			},
+			{
+				"name": "_wth",
+				"type": "uint256"
+			}
+		],
+		"name": "newEmployee",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_clock_addr",
+				"type": "address"
+			}
+		],
+		"name": "setClock",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "wth_balance",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"name": "_wth_addr",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "fallback"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_emp_addr",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"name": "_wage",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"name": "_wth",
+				"type": "uint256"
+			}
+		],
+		"name": "NewEmployee",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_emp_addr",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_emp_balance",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"name": "_new_wth",
+				"type": "uint256"
+			}
+		],
+		"name": "PayEmployee",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_clock_addr",
+				"type": "address"
+			}
+		],
+		"name": "SetClock",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_new_owner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_new_wth_addr",
+				"type": "address"
+			}
+		],
+		"name": "TransOwnership",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_emp_addr",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_time_worked",
+				"type": "uint256"
+			}
+		],
+		"name": "ClockOut",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_wth_account",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_wth_balance",
+				"type": "uint256"
+			}
+		],
+		"name": "PayWithholdings",
+		"type": "event"
+	}
+]); 
+        var jsContractAddress = '0x76b2ec7656a3a921f00851d8f32f9b8891bc38aa' // contract address (copy and pasted)
+        var abi = DQPayroll.at(jsContractAddress); // js contract interaction variable
+
+        /*****Connection of buttons and inputs from user-interface (js and jquery)*****/
+
+
+        $("#info-alert-button").click(function() {
+            var owner_address = abi.owner.call();
+            var withholdings_address = abi.wth_account.call();
+            var contract_balance = (web3.eth.getBalance(jsContractAddress)).toNumber() / (1000000000000000000);
+            var withholdings_balance = abi.wth_balance.call().toNumber() / (1000000000000000000);
+
+            alert('Contract Address: ' + jsContractAddress + '\n' + 'Owner Address: ' + owner_address + '\n' + 'Withholdings Address: ' + withholdings_address + '\n' + 'Contract Balance: ' + (contract_balance) + ' (eth)\n' + 'Withholdings Balance: ' + withholdings_balance + ' (eth)');
+        })
+
+        $("#add-emp-button").click(function() {  //  
+            abi.newEmployee($("#address").val(), $("#name").val(), ($("#wage").val()) * 1000000000000000000 / 3600, ($("#withholdings").val())); // Setting the html input on the UI to the contract. 
+            $("#address").val(''); // Clearing input 
+            $("#name").val(''); // Clearing input
+            $("#wage").val(''); // Clearing input 
+            $("#withholdings").val(''); // Clearing input
+        })
+
+        $("#add-clock-button").click(function() {  //  
+            abi.setClock($("#clock_address").val()); // Setting the html input on the UI to the contract. 
+            $("#clock_address").val(''); // Clearing input 
+        })
+
+        /* Get emp Info Call */
+        $('#emp-info-button').click(function() { // Upon button-click do this funtion.
+            emp_array = (abi.emp_struct_map($("#look-up-by-address").val()));
+            alert('Name: ' + emp_array[0] + ', ' + 'Wage: ' + (emp_array[1].toNumber() / 1000000000000000000 * 3600)  + ', ' + 'Withholdings: ' + emp_array[2].toNumber());
+        }) 
+
+        /* Manual Add Hours Functionality */
+        $("#manual-addtime-button").click(function() {  
+            abi.clockOut($("#manual-addtime-address").val(), $("#hours-worked").val() * 3600);
+            alert("Employee: " + $("#manual-addtime-address").val() + " has been credited with " + $("#hours-worked").val() + ' hours worked');
+            $("#manual-addtime-address").val(''); // Clearing input
+            $("#hours-worked").val(''); // Clearing input
+        })
+
+        /* Manual Pay Functionality */
+        $("#manual-pay-button").click(function() {  
+            abi.payEmployee($("#manual-pay-address").val());
+            alert("Employee: " + $("#manual-pay-address").val() + ' paid.');
+            $("#manual-pay-address").val(''); // Clearing input
+        })
+
+        /* Transfer Ownership Functionality */
+        $("#transfer_ownership_button").click(function() {  
+            abi.transOwnership($("#new_owner_address").val(), $("#new_withholding_address").val());
+            $("#new_owner_address").val(''); // Clearing input
+            $("#new_withholding_address").val(''); // Clearing input
+        })
+
+        /* Withdraw Wth Functionality */
+        $("#withdraw-wth").click(function() {  
+            abi.payWithholdings();
+            alert("Withholdings have been withdrawn")
+        })
+    </script>
+
+
+
+</body>
+</html>
+
+

@@ -1,0 +1,58 @@
+body {
+    background-color:powderblue; 
+    padding: 2em; /* padding is the space around an element's content em a measurment dynamic to text size */ 
+}
+
+.dq_image_css { /* DQ image (still need to add space between image and text) */
+    text-align: center; /* Aligns text with middle of image rather than bottom */
+}
+
+.container {
+    width: 75%; /* Only half of the page. */
+    margin: left; /* The left half */
+}
+
+
+.callBoxes { /* Text boxes for the returns of the contract calls */
+    padding:1em;
+    background-color:#fff;
+    margin: .5em 0;
+    width: 28em;
+}
+
+.callBoxesLong { /* Text boxes for the returns of the contract calls */
+    padding:1em;
+    background-color:#fff;
+    margin: .5em 0;
+}
+
+.lineBTN {
+    padding: 1em 4em;
+    display: inline-block;
+    margin-bottom: 1em; 
+}
+
+.label1{
+    align-self: right;
+}
+
+label {
+    padding: 1em;
+}
+
+input {
+    padding:10px;
+    width: 50%;
+    margin-bottom: 1em;
+}
+
+button {
+    padding: 1em 4em;
+    display:block;
+}
+
+
+
+
+
+
